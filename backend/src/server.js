@@ -62,7 +62,36 @@ app.use(
   }),
 );
 app.use(express.json({ limit: "10mb" }));
-app.use("/uploads", express.static(UPLOADS_DIR));
+
+// Serve uploads via route handler (works better with /tmp on Vercel)
+app.get("/uploads/:filename", async (req, res, next) => {
+  try {
+    const filename = req.params.filename;
+    // Sanitize filename to prevent directory traversal
+    const safeFilename = path.basename(filename);
+    const filePath = path.resolve(UPLOADS_DIR, safeFilename);
+    
+    try {
+      await fs.access(filePath);
+      res.sendFile(filePath);
+    } catch {
+      // If file doesn't exist in /tmp, try original location (for Vercel)
+      if (IS_VERCEL) {
+        const originalPath = path.resolve(ROOT_DIR, "uploads", safeFilename);
+        try {
+          await fs.access(originalPath);
+          res.sendFile(originalPath);
+        } catch {
+          res.status(404).json({ error: "File not found" });
+        }
+      } else {
+        res.status(404).json({ error: "File not found" });
+      }
+    }
+  } catch (error) {
+    next(error);
+  }
+});
 
 const storage = multer.diskStorage({
   destination: (_, __, cb) => {
@@ -192,6 +221,26 @@ async function ensureDataFiles() {
       await fs.writeFile(CONFIG_FILE, configData, "utf-8");
     } catch {
       // File doesn't exist, will create below
+    }
+    
+    // Copy existing upload files from repo to /tmp
+    const originalUploadsDir = path.join(ROOT_DIR, "uploads");
+    try {
+      const files = await fs.readdir(originalUploadsDir);
+      for (const file of files) {
+        try {
+          const originalFilePath = path.join(originalUploadsDir, file);
+          const stats = await fs.stat(originalFilePath);
+          if (stats.isFile()) {
+            const fileData = await fs.readFile(originalFilePath);
+            await fs.writeFile(path.join(UPLOADS_DIR, file), fileData);
+          }
+        } catch (err) {
+          console.warn(`Failed to copy upload file ${file}:`, err.message);
+        }
+      }
+    } catch {
+      // Uploads directory doesn't exist or is empty
     }
   }
   
