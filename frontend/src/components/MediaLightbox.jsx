@@ -1,9 +1,12 @@
+import { resolveMediaUrl } from "../utils/mediaUrl.js";
+
 function MediaLightbox({ design, onClose }) {
   if (!design) {
     return null;
   }
 
   const isVideo = design.mediaType?.startsWith("video");
+  const mediaUrl = resolveMediaUrl(design.mediaUrl);
 
   return (
     <div className="lightbox" role="dialog" aria-modal="true">
@@ -14,9 +17,9 @@ function MediaLightbox({ design, onClose }) {
         </button>
         <div className="lightbox__media">
           {isVideo ? (
-            <video src={design.mediaUrl} controls autoPlay />
+            <video src={mediaUrl} controls autoPlay />
           ) : (
-            <img src={design.mediaUrl} alt={design.title} />
+            <img src={mediaUrl} alt={design.title} />
           )}
         </div>
         <div className="lightbox__details">

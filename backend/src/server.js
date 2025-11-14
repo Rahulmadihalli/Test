@@ -69,26 +69,47 @@ app.get("/uploads/:filename", async (req, res, next) => {
     const filename = req.params.filename;
     // Sanitize filename to prevent directory traversal
     const safeFilename = path.basename(filename);
-    const filePath = path.resolve(UPLOADS_DIR, safeFilename);
+    let filePath = path.resolve(UPLOADS_DIR, safeFilename);
+    let found = false;
     
     try {
       await fs.access(filePath);
-      res.sendFile(filePath);
+      found = true;
     } catch {
       // If file doesn't exist in /tmp, try original location (for Vercel)
       if (IS_VERCEL) {
         const originalPath = path.resolve(ROOT_DIR, "uploads", safeFilename);
         try {
           await fs.access(originalPath);
-          res.sendFile(originalPath);
+          filePath = originalPath;
+          found = true;
         } catch {
-          res.status(404).json({ error: "File not found" });
+          // File not found in either location
         }
-      } else {
-        res.status(404).json({ error: "File not found" });
       }
     }
+    
+    if (found) {
+      // Set appropriate content type based on file extension
+      const ext = path.extname(safeFilename).toLowerCase();
+      const contentTypes = {
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.gif': 'image/gif',
+        '.webp': 'image/webp',
+        '.mp4': 'video/mp4',
+        '.mov': 'video/quicktime',
+        '.webm': 'video/webm',
+      };
+      const contentType = contentTypes[ext] || 'application/octet-stream';
+      res.setHeader('Content-Type', contentType);
+      res.sendFile(filePath);
+    } else {
+      res.status(404).json({ error: "File not found" });
+    }
   } catch (error) {
+    console.error("Error serving upload file:", error);
     next(error);
   }
 });

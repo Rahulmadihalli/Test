@@ -1,3 +1,5 @@
+import { resolveMediaUrl } from "../utils/mediaUrl.js";
+
 function DesignCard({ design, onSelect, isSelected, onPreview }) {
   const handleClick = () => {
     if (onSelect) {
@@ -8,6 +10,8 @@ function DesignCard({ design, onSelect, isSelected, onPreview }) {
       onPreview(design);
     }
   };
+
+  const mediaUrl = resolveMediaUrl(design.mediaUrl);
 
   return (
     <article
@@ -23,9 +27,9 @@ function DesignCard({ design, onSelect, isSelected, onPreview }) {
       }}
     >
       {design.mediaType?.startsWith("video") ? (
-        <video src={design.mediaUrl} controls preload="metadata" />
+        <video src={mediaUrl} controls preload="metadata" />
       ) : (
-        <img src={design.mediaUrl} alt={design.title} loading="lazy" />
+        <img src={mediaUrl} alt={design.title} loading="lazy" />
       )}
       {!onSelect ? (
         <div className="design-card__overlay">
