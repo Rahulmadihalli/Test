@@ -185,6 +185,14 @@ async function ensureDataFiles() {
     } catch {
       // File doesn't exist, will create empty array below
     }
+    
+    // Copy config.json if it exists in repo
+    try {
+      const configData = await fs.readFile(originalConfigFile, "utf-8");
+      await fs.writeFile(CONFIG_FILE, configData, "utf-8");
+    } catch {
+      // File doesn't exist, will create below
+    }
   }
   
   for (const filePath of [DESIGNS_FILE, BOOKINGS_FILE]) {
@@ -198,6 +206,8 @@ async function ensureDataFiles() {
   try {
     let config;
     let originalRaw = "";
+    let configNeedsWrite = false;
+    
     try {
       const raw = await fs.readFile(CONFIG_FILE, "utf-8");
       config = JSON.parse(raw);
@@ -210,11 +220,14 @@ async function ensureDataFiles() {
           const raw = await fs.readFile(originalConfigFile, "utf-8");
           config = JSON.parse(raw);
           originalRaw = raw;
+          configNeedsWrite = true; // Always write to /tmp if we read from original
         } catch {
           config = {};
+          configNeedsWrite = true;
         }
       } else {
         config = {};
+        configNeedsWrite = true;
       }
     }
 
@@ -233,6 +246,7 @@ async function ensureDataFiles() {
         );
       }
       config.adminToken = fallbackToken;
+      configNeedsWrite = true;
     }
 
     if (
@@ -241,10 +255,11 @@ async function ensureDataFiles() {
       config.adminEmail.trim().length === 0
     ) {
       config.adminEmail = DEFAULT_ADMIN_EMAIL;
+      configNeedsWrite = true;
     }
 
     const updatedRaw = JSON.stringify(config, null, 2);
-    if (originalRaw.trim() !== updatedRaw.trim()) {
+    if (configNeedsWrite || originalRaw.trim() !== updatedRaw.trim()) {
       await fs.writeFile(CONFIG_FILE, `${updatedRaw}\n`, "utf-8");
     }
   } catch (error) {
