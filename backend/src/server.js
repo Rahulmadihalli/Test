@@ -22,8 +22,12 @@ for (const candidate of envCandidates) {
   dotenv.config({ path: candidate, override: false });
 }
 
-const DATA_DIR = path.join(ROOT_DIR, "data");
-const UPLOADS_DIR = path.join(ROOT_DIR, "uploads");
+// Detect if running on Vercel (serverless) - use /tmp for writable storage
+const IS_VERCEL = process.env.VERCEL === "1" || process.cwd().startsWith("/var/task");
+const STORAGE_BASE = IS_VERCEL ? "/tmp" : ROOT_DIR;
+
+const DATA_DIR = path.join(STORAGE_BASE, "data");
+const UPLOADS_DIR = path.join(STORAGE_BASE, "uploads");
 
 const DESIGNS_FILE = path.join(DATA_DIR, "designs.json");
 const BOOKINGS_FILE = path.join(DATA_DIR, "bookings.json");
@@ -158,6 +162,31 @@ async function requireAdmin(req, res, next) {
 async function ensureDataFiles() {
   await fs.mkdir(DATA_DIR, { recursive: true });
   await fs.mkdir(UPLOADS_DIR, { recursive: true });
+  
+  // On Vercel, copy initial data from read-only repo files to /tmp
+  if (IS_VERCEL) {
+    const originalDataDir = path.join(ROOT_DIR, "data");
+    const originalDesignsFile = path.join(originalDataDir, "designs.json");
+    const originalBookingsFile = path.join(originalDataDir, "bookings.json");
+    const originalConfigFile = path.join(originalDataDir, "config.json");
+    
+    // Copy designs.json if it exists in repo
+    try {
+      const designsData = await fs.readFile(originalDesignsFile, "utf-8");
+      await fs.writeFile(DESIGNS_FILE, designsData, "utf-8");
+    } catch {
+      // File doesn't exist, will create empty array below
+    }
+    
+    // Copy bookings.json if it exists in repo
+    try {
+      const bookingsData = await fs.readFile(originalBookingsFile, "utf-8");
+      await fs.writeFile(BOOKINGS_FILE, bookingsData, "utf-8");
+    } catch {
+      // File doesn't exist, will create empty array below
+    }
+  }
+  
   for (const filePath of [DESIGNS_FILE, BOOKINGS_FILE]) {
     try {
       await fs.access(filePath);
@@ -174,7 +203,19 @@ async function ensureDataFiles() {
       config = JSON.parse(raw);
       originalRaw = raw;
     } catch {
-      config = {};
+      // If config doesn't exist in /tmp, try to read from original location on Vercel
+      if (IS_VERCEL) {
+        try {
+          const originalConfigFile = path.join(ROOT_DIR, "data", "config.json");
+          const raw = await fs.readFile(originalConfigFile, "utf-8");
+          config = JSON.parse(raw);
+          originalRaw = raw;
+        } catch {
+          config = {};
+        }
+      } else {
+        config = {};
+      }
     }
 
     if (
@@ -364,7 +405,7 @@ app.delete("/api/admin/designs/:id", requireAdmin, async (req, res, next) => {
 
     if (removed?.mediaUrl) {
       const relativePath = removed.mediaUrl.replace(/^\/*/, "");
-      const filePath = path.join(ROOT_DIR, relativePath);
+      const filePath = path.join(STORAGE_BASE, relativePath);
       fs.unlink(filePath).catch(() => {
         console.warn(`Failed to delete file ${filePath}`);
       });
