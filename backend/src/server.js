@@ -35,9 +35,25 @@ const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "http://localhost:3000";
 const INITIAL_ADMIN_TOKEN = process.env.ADMIN_TOKEN?.trim();
 const DEFAULT_ADMIN_EMAIL = "sheetalgawas27@gmail.com";
 
+// Allow multiple origins for development and production
+const allowedOrigins = [
+  CLIENT_ORIGIN,
+  "http://localhost:3000",
+  "https://mehandi-three.vercel.app",
+].filter(Boolean);
+
 app.use(
   cors({
-    origin: CLIENT_ORIGIN,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+      
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
   }),
 );
