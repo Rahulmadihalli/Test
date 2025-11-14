@@ -46,6 +46,20 @@ export async function fetchBookings(token) {
   return response.data;
 }
 
+export async function deleteBooking(id, token) {
+  const response = await client.delete(`/admin/bookings/${id}`, {
+    headers: withAdminHeaders(token),
+  });
+  return response.data;
+}
+
+export async function clearAllBookings(token) {
+  const response = await client.delete("/admin/bookings", {
+    headers: withAdminHeaders(token),
+  });
+  return response.data;
+}
+
 export async function updateAdminToken({ token, newToken }) {
   const response = await client.post(
     "/admin/token",

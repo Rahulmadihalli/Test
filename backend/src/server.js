@@ -525,6 +525,34 @@ app.get("/api/admin/bookings", requireAdmin, async (req, res, next) => {
   }
 });
 
+app.delete("/api/admin/bookings/:id", requireAdmin, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const bookings = await readJsonArray(BOOKINGS_FILE);
+    const index = bookings.findIndex((item) => item.id === id);
+
+    if (index === -1) {
+      return res.status(404).json({ error: "Booking not found." });
+    }
+
+    bookings.splice(index, 1);
+    await writeJsonArray(BOOKINGS_FILE, bookings);
+
+    res.json({ message: "Booking removed." });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete("/api/admin/bookings", requireAdmin, async (req, res, next) => {
+  try {
+    await writeJsonArray(BOOKINGS_FILE, []);
+    res.json({ message: "All bookings cleared." });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post("/api/admin/token", requireAdmin, async (req, res, next) => {
   try {
     const { newToken } = req.body || {};

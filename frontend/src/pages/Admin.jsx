@@ -5,6 +5,8 @@ import {
   uploadDesign,
   fetchBookings,
   deleteDesign,
+  deleteBooking,
+  clearAllBookings,
   updateAdminToken,
 } from "../api/adminApi.js";
 import { fetchDesigns } from "../api/bookingApi.js";
@@ -21,6 +23,7 @@ function Admin() {
   });
   const [uploadStatus, setUploadStatus] = useState({ type: "idle", message: "" });
   const [deleteStatus, setDeleteStatus] = useState({ type: "idle", message: "" });
+  const [bookingDeleteStatus, setBookingDeleteStatus] = useState({ type: "idle", message: "" });
   const [authStatus, setAuthStatus] = useState({ type: "idle", message: "" });
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [adminToken, setAdminToken] = useState(() => {
@@ -220,6 +223,58 @@ function Admin() {
     }
   };
 
+  const handleDeleteBooking = async (id) => {
+    if (!isAuthenticated || !adminToken) {
+      resetAdminSession("Admin login is required to manage bookings.");
+      return;
+    }
+
+    try {
+      setBookingDeleteStatus({ type: "loading", message: "Removing booking..." });
+      await deleteBooking(id, adminToken);
+      setBookingDeleteStatus({ type: "success", message: "Booking removed." });
+      await refreshBookings(adminToken);
+      // Clear status after 3 seconds
+      setTimeout(() => setBookingDeleteStatus({ type: "idle", message: "" }), 3000);
+    } catch (error) {
+      if (error?.response?.status === 401) {
+        resetAdminSession("Admin session expired. Please log in again.");
+      }
+      setBookingDeleteStatus({
+        type: "error",
+        message: error?.response?.data?.error ?? "Failed to delete booking.",
+      });
+    }
+  };
+
+  const handleClearAllBookings = async () => {
+    if (!isAuthenticated || !adminToken) {
+      resetAdminSession("Admin login is required to manage bookings.");
+      return;
+    }
+
+    if (!confirm("Are you sure you want to clear all bookings? This action cannot be undone.")) {
+      return;
+    }
+
+    try {
+      setBookingDeleteStatus({ type: "loading", message: "Clearing all bookings..." });
+      await clearAllBookings(adminToken);
+      setBookingDeleteStatus({ type: "success", message: "All bookings cleared." });
+      await refreshBookings(adminToken);
+      // Clear status after 3 seconds
+      setTimeout(() => setBookingDeleteStatus({ type: "idle", message: "" }), 3000);
+    } catch (error) {
+      if (error?.response?.status === 401) {
+        resetAdminSession("Admin session expired. Please log in again.");
+      }
+      setBookingDeleteStatus({
+        type: "error",
+        message: error?.response?.data?.error ?? "Failed to clear bookings.",
+      });
+    }
+  };
+
   const handleTokenFormChange = (event) => {
     const { name, value } = event.target;
     setTokenForm((prev) => ({ ...prev, [name]: value }));
@@ -380,7 +435,24 @@ function Admin() {
             </section>
 
             <section className="admin-card">
-              <h3>Recent Bookings</h3>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+                <h3>Recent Bookings</h3>
+                {bookings.length > 0 && (
+                  <button
+                    type="button"
+                    className="button button--danger"
+                    onClick={handleClearAllBookings}
+                    style={{ fontSize: "0.875rem", padding: "0.5rem 1rem" }}
+                  >
+                    Clear All
+                  </button>
+                )}
+              </div>
+              {bookingDeleteStatus.type !== "idle" ? (
+                <p className={`form-status form-status--${bookingDeleteStatus.type}`}>
+                  {bookingDeleteStatus.message}
+                </p>
+              ) : null}
               {bookings.length === 0 ? (
                 <p className="info-text">No bookings yet.</p>
               ) : (
@@ -417,6 +489,14 @@ function Admin() {
                           </p>
                         ) : null}
                         {booking.message ? <p>{booking.message}</p> : null}
+                        <button
+                          type="button"
+                          className="button button--danger"
+                          onClick={() => handleDeleteBooking(booking.id)}
+                          style={{ marginTop: "0.5rem", fontSize: "0.875rem", padding: "0.375rem 0.75rem" }}
+                        >
+                          Delete
+                        </button>
                       </li>
                     ))}
                 </ul>
