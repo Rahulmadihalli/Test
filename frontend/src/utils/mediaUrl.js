@@ -18,6 +18,9 @@ export function resolveMediaUrl(mediaUrl) {
   // Ensure mediaUrl starts with /
   const normalizedUrl = mediaUrl.startsWith("/") ? mediaUrl : `/${mediaUrl}`;
   
-  return `${backendBaseUrl}${normalizedUrl}`;
+  const resolvedUrl = `${backendBaseUrl}${normalizedUrl}`;
+  console.log(`[MediaURL] Resolved ${mediaUrl} to ${resolvedUrl}`);
+  
+  return resolvedUrl;
 }
 

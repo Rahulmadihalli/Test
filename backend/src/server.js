@@ -72,20 +72,28 @@ app.get("/uploads/:filename", async (req, res, next) => {
     let filePath = path.resolve(UPLOADS_DIR, safeFilename);
     let found = false;
     
+    console.log(`[Uploads] Requested file: ${safeFilename}`);
+    console.log(`[Uploads] Checking /tmp path: ${filePath}`);
+    
     try {
       await fs.access(filePath);
       found = true;
+      console.log(`[Uploads] Found file in /tmp: ${filePath}`);
     } catch {
       // If file doesn't exist in /tmp, try original location (for Vercel)
       if (IS_VERCEL) {
         const originalPath = path.resolve(ROOT_DIR, "uploads", safeFilename);
+        console.log(`[Uploads] Checking original path: ${originalPath}`);
         try {
           await fs.access(originalPath);
           filePath = originalPath;
           found = true;
-        } catch {
-          // File not found in either location
+          console.log(`[Uploads] Found file in original location: ${originalPath}`);
+        } catch (err) {
+          console.log(`[Uploads] File not found in original location: ${err.message}`);
         }
+      } else {
+        console.log(`[Uploads] File not found in /tmp and not on Vercel`);
       }
     }
     
@@ -104,12 +112,15 @@ app.get("/uploads/:filename", async (req, res, next) => {
       };
       const contentType = contentTypes[ext] || 'application/octet-stream';
       res.setHeader('Content-Type', contentType);
+      res.setHeader('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
+      console.log(`[Uploads] Serving file: ${filePath} with content-type: ${contentType}`);
       res.sendFile(filePath);
     } else {
-      res.status(404).json({ error: "File not found" });
+      console.log(`[Uploads] File not found: ${safeFilename}`);
+      res.status(404).json({ error: "File not found", filename: safeFilename });
     }
   } catch (error) {
-    console.error("Error serving upload file:", error);
+    console.error("[Uploads] Error serving upload file:", error);
     next(error);
   }
 });
